@@ -1,76 +1,68 @@
-# BOSH Release for git-branches-resource
+BOSH Release for git-branches-resource
+============================================
 
-## Usage
+Tracks when branches (refs) are added or removed from a git repository, and returns a list of all current branches whenever any are added or removed.
 
-To use this bosh release, first upload it to your bosh:
+This BOSH release packages @pivotaltracker's [git-branches-resource](https://github.com/pivotaltracker/git-branches-resource) for Concourse, to make it simple to include the additional Concourse resource in your BOSH deployed Concourse system.
 
-```
-bosh target BOSH_HOST
-git clone https://github.com/cloudfoundry-community/git-branches-resource-boshrelease.git
-cd git-branches-resource-boshrelease
-bosh upload release releases/git-branches-resource-1.yml
-```
+Final releases are automatically created based on any changes to the upstream git-branches-resource
 
-For [bosh-lite](https://github.com/cloudfoundry/bosh-lite), you can quickly create a deployment manifest & deploy a cluster:
+See the build pipeline https://ci.starkandwayne.com/pipelines/git-branches-resource-boshrelease for status.
 
-```
-templates/make_manifest warden
-bosh -n deploy
-```
+<!-- TODO: Final releases are available on https://bosh.io/releases as well as this project's own [GitHub releases](https://github.com/cloudfoundry-community/git-branches-resource-boshrelease/releases). -->
 
-For AWS EC2, create a single VM:
+Installation
+------------
+
+To use this bosh release, first upload it to the BOSH/bosh-lite that is running Concourse:
 
 ```
-templates/make_manifest aws-ec2
-bosh -n deploy
+bosh upload release https://bosh.io/d/github.com/cloudfoundry-community/git-branches-resource-boshrelease
 ```
 
-### Override security groups
+Next, update your Concourse deployment manifest to add the resource.
 
-For AWS & Openstack, the default deployment assumes there is a `default` security group. If you wish to use a different security group(s) then you can pass in additional configuration when running `make_manifest` above.
+Add the `git-branches-resource` release to the list:
 
-Create a file `my-networking.yml`:
-
-``` yaml
----
-networks:
-  - name: git-branches-resource1
-    type: dynamic
-    cloud_properties:
-      security_groups:
-        - git-branches-resource
+```yaml
+releases:
+  - name: concourse
+    version: latest
+  - name: garden-linux
+    version: latest
+  - name: git-branches-resource
+    version: latest
 ```
 
-Where `- git-branches-resource` means you wish to use an existing security group called `git-branches-resource`.
+Into the `worker` job, add the `{release: git-branches-resource, name: just_install_packages}` job template that will install the package:
 
-You now suffix this file path to the `make_manifest` command:
-
-```
-templates/make_manifest openstack-nova my-networking.yml
-bosh -n deploy
-```
-
-### Development
-
-As a developer of this release, create new releases and upload them:
-
-```
-bosh create release --force && bosh -n upload release
+```yaml
+jobs:
+- name: worker
+  templates:
+    ...
+    - {release: git-branches-resource, name: just_install_packages}
 ```
 
-### Final releases
+The final change is to add the `git-branches-resource` package to the list of `additional_resource_types`:
 
-To share final releases:
-
-```
-bosh create release --final
-```
-
-By default the version number will be bumped to the next major number. You can specify alternate versions:
-
-
-```
-bosh create release --final --version 2.1
+```yaml
+jobs:
+- name: worker
+  ...
+  properties:
+    groundcrew:
+      additional_resource_types:
+      - type: git-branches
+        image: /var/vcap/packages/git-branches-resource
 ```
 
-After the first release you need to contact [Dmitriy Kalinin](mailto://dkalinin@pivotal.io) to request your project is added to https://bosh.io/releases (as mentioned in README above).
+And `bosh deploy` your Concourse manifest.
+
+
+Setup pipeline in Concourse
+---------------------------
+
+```
+fly -t snw c -c pipeline.yml --vars-from credentials.yml git-branches-resource-boshrelease
+```

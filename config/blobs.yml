@@ -1,1 +1,5 @@
---- {}
+---
+git-branches-resource/rootfs.tar:
+  object_id: 134ebe3e-fba0-45a7-b878-3629c83ab72f
+  sha: 0fbc1fc172b6220ac546a1699be79a7bdf505d6f
+  size: 19896320
